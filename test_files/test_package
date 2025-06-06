@@ -1,0 +1,8 @@
+"""Test to see if the Python package is being accessed correctly """
+
+from miller_lib import add_two
+
+a = 5
+b = 8
+
+print(add_two(a,b))

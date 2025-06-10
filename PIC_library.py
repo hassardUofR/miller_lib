@@ -14,7 +14,7 @@ from time import time
 # !!! Need to add ports back in apparently
 @gf.cell # This decorator helps gdsfactory with its strict no-duplicate naming requirements if multiple instances are called
 def UCSB_grating_1550(fid=False,bs_fid=False,
-                      gds_library_path = "./gds_files/"): # C:/Users/bhassard/Box/BLMGroup/Layouts/RACER_5/URMC_SPT/library
+                      gds_library_path = "./miller_lib/gds_files/"): # C:/Users/bhassard/Box/BLMGroup/Layouts/RACER_5/URMC_SPT/library
     """Imports the 1550 nm grating coupler from the Meinhart lab at UCSB
     
     Args:

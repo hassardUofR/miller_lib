@@ -1,17 +1,13 @@
 import gdsfactory as gf
 import numpy as np
 from matplotlib import pyplot as plt
+from functools import partial
 
 from time import time
 
-# PYTHON: NEED TO BE ABLE TO ACCESS PATH OF THE BOX DRIVE
-# (or other SPT library - or put GDS files into a local directory in the miller_lib package folder.)
-
-# GDSFactory/OptoDesigner: NEED TO GET CORRECT cross_section AND USE!!!
 
 
 
-# !!! Need to add ports back in apparently
 @gf.cell # This decorator helps gdsfactory with its strict no-duplicate naming requirements if multiple instances are called
 def UCSB_grating_1550(fid=False,bs_fid=False,
                       gds_library_path = "./miller_lib/gds_files/"): # C:/Users/bhassard/Box/BLMGroup/Layouts/RACER_5/URMC_SPT/library
@@ -44,12 +40,36 @@ def UCSB_grating_1550(fid=False,bs_fid=False,
     c.add_port(name="o1",center=(-100,0),width=1.5,orientation=180,layer=c.layers[-2])
 
     c.movex(-180) # This appears to center the gds for rotation around the actual grating (i.e. for building the grating array)
-    
-    # label = c << gf.components.rectangle(size=(10,10),centered=True)
-    # label.movex(0)
-    # label.movey(300)
-    # Is this the best way to return a Component?
     return c
+
+@gf.cell # This decorator helps gdsfactory with its strict no-duplicate naming requirements if multiple instances are called
+def UCSB_grating_1550_straightened(grating_angle=0,output_angle=90,radius=50,euler_part=0.2,straight1=10,straight2=10,**kwargs): # C:/Users/bhassard/Box/BLMGroup/Layouts/RACER_5/URMC_SPT/library
+    """Calls UCSB_grating_1550 but adds an extruded Path to make the port at 180 degrees.
+    """
+
+    c = gf.Component()
+
+    grating = c << UCSB_grating_1550(**kwargs)
+    grating.rotate(grating_angle)
+
+
+
+    path1 = gf.path.straight(length=straight1)
+    path2 = gf.path.euler(radius=radius,angle=output_angle-grating_angle,p=euler_part)
+    path3 = gf.path.straight(length=straight2)
+
+    p = path1+path2+path3
+
+    # xsec = gf.cross_section.strip(width=1.5,layer=(733,727),port_names=("in","out"))
+    xsec = partial(gf.cross_section.strip,width=1.5,layer=(733,727),port_names=("in","out"))
+    
+    curve = c << gf.path.extrude(p,cross_section=xsec)
+    curve.connect("in",other=grating.ports["o1"])
+
+    c.add_ports(curve.ports) # Include ports for coupling waveguides
+    c.flatten()
+    return c
+
 
 @gf.cell
 def array_UCSB_grating_1550(gratings: list = [2,3,4,5,6,7],rotations: list = [-104,-104,-76,-77,-90,-90,-103],**kwargs):
@@ -65,11 +85,11 @@ def array_UCSB_grating_1550(gratings: list = [2,3,4,5,6,7],rotations: list = [-1
         **kwargs: Optional keyword arguments for UCSB_grating_1550(**kwargs)
 
 
-    Gratings numbering: (2/3 and 5/6 appeared to get switched in the 1x4 PIC!?)
+    Gratings numbering:
            1
-      2         3
+      3         2
            4
-      5         6
+      6         5
            7
 
            
@@ -78,7 +98,7 @@ def array_UCSB_grating_1550(gratings: list = [2,3,4,5,6,7],rotations: list = [-1
     array = gf.Component()
 
     # Lists of the x and y shifts needed for each grating
-    xvals = [0,-300,300,0,-300,300,0]
+    xvals = [0,-300-1,300+1,0+1,-300,300,0-1]
     yvals = [-346.410,-173.205,-173.205,0,173.205,173.205,346.410]
     # [90,104,76,77,90,90,103]
     for grating in gratings:
@@ -92,6 +112,52 @@ def array_UCSB_grating_1550(gratings: list = [2,3,4,5,6,7],rotations: list = [-1
     array.rotate(180) # Originally built upside down to match Michael's OptoDesigner setup
     array.flatten()
     return array
+
+@gf.cell
+def array_UCSB_grating_1550_straight(gratings: list = [2,3,4,5,6,7],rotations: list = [-104,-104,-76,-77,-90,-90,-103],**kwargs):
+    """Uses UCSB_grating_1550_straightened to make straight output ports.
+
+    Args:
+        Gratings: list-like array of integers marking which of the gratings will be included, optional (default is [2,3,4,5,6,7]).
+            Only gratings listed will be included in the grating bundle.
+
+        Rotations: Optional list-like array of floats (default is [-104,-104,-76,-77,-90,-90,-103])
+            Rotations to be applied before x/y shifts. Default angles were taken from OptoDesigner 1x4 mm PICs.
+
+        **kwargs: Optional keyword arguments for UCSB_grating_1550(**kwargs)
+
+
+    Gratings numbering: 
+           1
+      3         2
+           4
+      6         5
+           7
+
+           
+    Returns: A Component with the listed gratings included at the rotation angles.
+    """
+    array = gf.Component()
+
+    # Lists of the x and y shifts needed for each grating
+    xvals = [0,-300-1,300+1,0+1,-300,300,0-1]
+    yvals = [-346.410,-173.205,-173.205,0,173.205,173.205,346.410]
+    # [90,104,76,77,90,90,103]
+    for grating in gratings:
+        add = array << UCSB_grating_1550_straightened(
+            grating_angle=rotations[grating-1],output_angle=-90,radius=50,euler_part=0.2,straight1=10,straight2=10,
+            **kwargs) # Add a grating into the array
+        
+        add.movey(yvals[grating-1]) # Shift grating to correct location (Python indexing from 0)
+        add.movex(xvals[grating-1])
+        array.add_port("grating_"+str(grating)+"_",port=add.ports["out"])
+        # array.add_ports(add.ports,prefix="grating_"+str(grating)+"_")
+    
+    
+    array.rotate(180) # Originally built upside down to match Michael's OptoDesigner setup
+    array.flatten()
+    return array
+
 
 @gf.cell
 def myMMI1x6(width: float = 1.5, width_taper: float = 4.0, width_mmi: float = 45.0,
@@ -127,7 +193,7 @@ def ring_BB_single(lambda_um: float = 1.55, m: int = 600, gap: float = 0.9,
         neff = neff_index_data(radius)
         radius = m*lambda_um/2/np.pi/neff
     
-    ring = gf.components.rings.ring_single(radius=radius,gap=gap,length_x=racetrack,length_y=0,**kwargs)
+    ring = gf.components.rings.ring_single(radius=radius,gap=gap,length_x=racetrack,length_y=0,bend="bend_circular",**kwargs)
     return ring
 
 @gf.cell
@@ -172,18 +238,18 @@ def ring_col(num: int = 3, ysep: float | list = 400.0, xsep: list | None = None,
         ring.movey(np.sum(ysep[:i]))
         ring.movex(xsep[i])
         c.add_ports(ring.ports,prefix="ring"+str(i+1)+"_")
-
         if i > 0:
-            route = gf.routing.route_single(c,port1=c.ports["ring"+str(i)+"_"+"o1"],port2=c.ports["ring"+str(i+1)+"_"+"o2"],
+            # route = gf.routing.route_single(c,port1=c.ports["ring"+str(i)+"_"+"o1"],port2=c.ports["ring"+str(i+1)+"_"+"o2"], #!!! This is where I am getting the UserWarning.
+            #                                 cross_section=cross_section)
+            route = gf.routing.route_bundle(c,port1=c.ports["ring"+str(i)+"_"+"o1"],port2=c.ports["ring"+str(i+1)+"_"+"o2"], #!!! This is where I am getting the UserWarning.
                                             cross_section=cross_section)
-    
     # for j,port in enumerate(c.ports):
     #     if j != 0 and j != len(c.ports)-1:
     #         c.remove_port[port.name]
     return c
 
 @gf.cell
-def ring_arr(channels=6,channel_sep=50,offset=True,offset_sep=300,
+def ring_arr(num=3,channels=6,channel_sep=50,offset=True,offset_sep=300,
              rot_step=-30,
              rotate=True, port_width=1.5,port_layer=(0,1),**kwargs):
     """ Builds an array of ring resonators in multiple columnar channels (calls miller_lib.ring_col)
@@ -243,6 +309,11 @@ def ring_arr(channels=6,channel_sep=50,offset=True,offset_sep=300,
                 col.movey(col.dysize)
                 # x += col.dxsize
                 step += col.dxsize + rot_step
+                c.add_port("col"+str(i+1)+"_o2",port=col.ports["ring1_o2"])
+                c.add_port("col"+str(i+1)+"_o1",port=col.ports["ring"+str(num)+"_o1"])
+            else:
+                c.add_port("col"+str(i+1)+"_o1",port=col.ports["ring1_o2"])
+                c.add_port("col"+str(i+1)+"_o2",port=col.ports["ring"+str(num)+"_o1"])
         col.movex(channel_sep*i+step)
         x += channel_sep*i+step
         if offset is True:
@@ -250,12 +321,12 @@ def ring_arr(channels=6,channel_sep=50,offset=True,offset_sep=300,
                 col.movey(offset_sep)
                 y += offset_sep
         
-        c.add_port(name="col"+str(i+1)+"_o1",width=port_width,orientation=-90,center=(x,y),layer=port_layer)
-        c.add_port(name="col"+str(i+1)+"_o2",width=port_width,orientation=90,center=(x,y+h),layer=port_layer)
+        # c.add_port(name="col"+str(i+1)+"_o1",width=port_width,orientation=-90,center=(x,y),layer=port_layer)
+        # c.add_port(name="col"+str(i+1)+"_o2",width=port_width,orientation=90,center=(x,y+h),layer=port_layer)
     return c
     
 @gf.cell
-def ring_arr_same_heights(channels=6,channel_sep=50,offset=True,offset_sep=300,
+def ring_arr_same_heights(num=3,channels=6,channel_sep=50,offset=True,offset_sep=300,
              rot_step=-30,cross_section="strip",
              rotate=True, port_width=1.5,port_layer=(0,1),**kwargs):
         
@@ -317,7 +388,7 @@ def ring_arr_same_heights(channels=6,channel_sep=50,offset=True,offset_sep=300,
                 step += col.dxsize*0 + rot_step
         
         col.movey(-col.dymin)
-        col.movex(-port_width/2-col.dxmin)
+        col.movex(-0/2-col.dxmin) # Was the 1.5 width
         
 
 
@@ -332,19 +403,22 @@ def ring_arr_same_heights(channels=6,channel_sep=50,offset=True,offset_sep=300,
         if rotate is True:
             if i/2 == i//2:
                 extra = c << gf.components.waveguides.straight(length=offset_sep,cross_section=cross_section)
-                extra.rotate(90)
-                extra.movex(step+channel_sep*i+extra.dxsize/2)
-                extra.movey(col.dysize-extra.dxsize/2)
+                extra.connect("o1",other=col.ports["ring"+str(num)+"_o1"]) #!!! Need to fix the number of rings passed in
+                # extra.rotate(90)
+                # extra.movex(step+channel_sep*i+extra.dxsize/2)
+                # extra.movey(col.dysize-extra.dxsize/2)
+                c.add_port("col"+str(i+1)+"_o1",port=col.ports["ring1_o2"])
+                c.add_port("col"+str(i+1)+"_o2",port=extra.ports["o2"])
             else:
                 extra = c << gf.components.waveguides.straight(length=offset_sep,cross_section=cross_section)
-                extra.rotate(90)
-                extra.movex(step+channel_sep*i-extra.dxsize/2+col.dxsize)
-                extra.movey(extra.dxsize/2)
-                y -= extra.dysize
-            h += extra.dysize
-
-        c.add_port(name="col"+str(i+1)+"_o1",width=port_width,orientation=-90,center=(x,y),layer=port_layer)
-        c.add_port(name="col"+str(i+1)+"_o2",width=port_width,orientation=90,center=(x,y+h),layer=port_layer)
+                extra.connect("o2",other=col.ports["ring"+str(num)+"_o1"])
+                # extra.rotate(90)
+                # extra.movex(step+channel_sep*i-extra.dxsize/2+col.dxsize)
+                # extra.movey(extra.dxsize/2)
+                # y -= extra.dysize
+                c.add_port("col"+str(i+1)+"_o2",port=col.ports["ring1_o2"])
+                c.add_port("col"+str(i+1)+"_o1",port=extra.ports["o1"])
+            # h += extra.dysize
     return c
     
 

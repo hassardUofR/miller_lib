@@ -3,6 +3,8 @@ import miller_lib as ml
 import numpy as np
 from matplotlib import pyplot as plt
 
+gf.gpdk.PDK.activate()
+
 # Instantiate a component and set up the die
 c = gf.Component()
 die = c << gf.components.die((1000,4000),die_name=None)#"Hello, world")
@@ -21,7 +23,8 @@ c.add_ports(input.ports,prefix="input_") # Include ports for coupling waveguides
 
 # output_order = [5,2,7,4,3,6]
 # output_order = [1=,2=,3=,4=,5=,6=]
-output = c << ml.array_UCSB_grating_1550(fid=False,bs_fid=False)
+# output = c << ml.array_UCSB_grating_1550(fid=False,bs_fid=False)
+output = c << ml.array_UCSB_grating_1550_straight() # Using fixed/straightened function.
 output.rotate(0)
 output.movey(3500) # May need to adjust y value
 output.movex(500)
@@ -79,7 +82,7 @@ connect = gf.routing.route_bundle_sbend(c,mmi_ports,ring_ports,allow_width_misma
 ring_bank_ports = [c.ports["rings_col"+str(i+1)+"_o2"] for i in range(6)]
 # output_order = [5,2,7,4,3,6]
 output_order = [6,3,7,4,2,5]
-output_ports = [c.ports["output_grating_"+str(n)+"_o1"] for n in output_order]
+output_ports = [c.ports["output_grating_"+str(n)+"_"] for n in output_order]
 connect2 = gf.routing.route_bundle_sbend(c,ring_bank_ports,output_ports,allow_layer_mismatch=True,enforce_port_ordering=True)
 
 
@@ -87,7 +90,7 @@ connect2 = gf.routing.route_bundle_sbend(c,ring_bank_ports,output_ports,allow_la
 # print()
 # print(c.ports)
 # c.draw_ports()
-# c.write_gds(r"C:\Users\bhassard\Downloads\tmpgds.gds")
+c.write_gds(r"D:\blmgrp\Downloads\tmpgds.gds")
 c.plot()
 plt.show()
 

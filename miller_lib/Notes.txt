@@ -1,0 +1,18 @@
+Notes to keep in mind while designing the miller_lib PIC library:
+
+- GDSFactory's routing functions seem to complain for ports that do not line up on the cardinal directions (0, 90, 180, and 270 degrees). Extruded Paths, however, work just fine - so connect a Path to the end of an angled port (e.g. output grating couplers) to make it line up properly.
+
+- You now have to activate a PDK for GDSFactory. A default/temporary PDK can be used via gf.gpdk.PDK.activate(). We should make a custom PDK or find out how to import from AIM.
+
+- Using a cross-section into the correct layer (matching the numbers from the Meinhart GDS files) now seems to work, at least for extruding paths.
+
+- For Euler adiabatic bends, the ideal partial Euler parameter varies - run simulations to determine what is best in our case. https://dx.doi.org/10.1364/oe.27.031394
+   - There may be other better ways to describe adiabatic bending - I need to do some reading.
+
+
+
+GDSFactory logic/organization (inferred):
+- GDS designs are built around the Component object. Parametric cells of a design are also Components, and can be integrated into a larger Component.
+- Waveguide parameters (layers, width, and cross-section e.g. strip vs rib) are fixed by a cross_section callable (function/partial function). functools.partial is used to fix the desired parameters of the cross_section from a GDSFactory base such as gf.cross_section.strip.
+- Using Component.show() opens the component in KLayout for live viewing (rather than opening a saved GDS file).
+

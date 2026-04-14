@@ -3,6 +3,8 @@ import gdsfactory as gf
 import matplotlib.pyplot as plt
 import numpy as np
 
+gf.gpdk.PDK.activate()
+
 C = gf.Component()
 
 ring = C << ml.ring_arr()

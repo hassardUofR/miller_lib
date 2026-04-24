@@ -1,6 +1,7 @@
 Notes to keep in mind while designing the miller_lib PIC library:
 
 - GDSFactory's routing functions seem to complain for ports that do not line up on the cardinal directions (0, 90, 180, and 270 degrees). Extruded Paths, however, work just fine - so connect a Path to the end of an angled port (e.g. output grating couplers) to make it line up properly.
+   - The downside with this is that it can lead to less-than-ideal s-curves and unnecessary bending. Is there a better way to do it? Maybe modify the routing function??? Or experiment with other routing functions...
 
 - You now have to activate a PDK for GDSFactory. A default/temporary PDK can be used via gf.gpdk.PDK.activate(). We should make a custom PDK or find out how to import from AIM.
 

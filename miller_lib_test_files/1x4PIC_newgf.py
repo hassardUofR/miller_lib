@@ -30,8 +30,8 @@ input.movey(350+50-5) # Make sure to get the y value right!!!
 c.add_ports(input.ports,prefix="input_") # Include ports for coupling waveguides
 
 
-# output = c << ml.array_UCSB_grating_1550(fid=False,bs_fid=False)
-output = c << ml.array_UCSB_grating_1550_straight() # Using fixed/straightened function.
+output = c << ml.array_UCSB_grating_1550(fid=False,bs_fid=False)
+# output = c << ml.array_UCSB_grating_1550_straight() # Using fixed/straightened function.
 output.rotate(0)
 output.movey(3500+105) # May need to adjust y values here too
 output.movex(500)
@@ -40,11 +40,13 @@ c.add_ports(output.ports,prefix="output_")
 # MMI
 MMI = c << ml.myMMI1x6(cross_section=xsec)
 MMI.rotate(90)
-MMI.connect("o1",input.ports["o1"],allow_layer_mismatch=True)
+MMI.connect("o1",input.ports["o1"])
+MMI.movey(-80)
+c.add_ports(MMI.ports,prefix="MMI_")
 
 
 # Ring resonator column variables
-yshift = 1320
+yshift = 1320-80
 xshift = 170 # 150 for m=600
 rotatey = 1400
 rotatex = 180
@@ -54,7 +56,8 @@ m = 400
 
 # # Add ring resonators and connect with waveguides
 # # rings = c << ml.ring_arr(m=500,channel_sep=50,offset_sep=250,ysep=500) # channel_sep = 20 for m=600???
-rings = c << ml.ring_arr_same_heights(m=500,channel_sep=200,offset_sep=250,ysep=500,rot_step=-170,cross_section=xsec)
+rings = c << ml.ring_arr_same_heights(m=m,channel_sep=200,offset_sep=250,ysep=500,rot_step=-170,cross_section=xsec)
+# rings = c << ml.ring_arr_scurve(m=m,channel_sep=(200,200),offset_sep=250,ysep=500,rot_step=-170+1.5+0.9,cross_section=xsec) #!!! o1 and o2 ports are switched here for some reason...
 rings.movey(yshift)
 rings.movex(xshift)
 c.add_ports(rings.ports,prefix="rings_")
@@ -68,15 +71,28 @@ connect = gf.routing.route_bundle_sbend(c,mmi_ports,ring_ports,cross_section=xse
 ring_bank_ports = [c.ports["rings_col"+str(i+1)+"_o2"] for i in range(6)]
 output_order = [6,3,7,4,2,5]
 output_ports = [c.ports["output_grating_"+str(n)+"_"] for n in output_order]
-connect2 = gf.routing.route_bundle_sbend(c,ring_bank_ports,output_ports,cross_section=xsec,enforce_port_ordering=True) #allow_layer_mismatch=False
+
+
+# connect2 = gf.routing.route_bundle_sbend(c,ring_bank_ports,output_ports,cross_section=xsec,enforce_port_ordering=True)
+
+
+
+for i in range(len(output_order)):
+    a = ring_bank_ports[i]
+    b = output_ports[i]
+    bend = c << ml.connect_ports_smooth(a,b,cross_section=xsec)
 
 
 # Plot or save the result 
 # c.write_gds(r"D:\blmgrp\Downloads\tmpgds.gds") # Save the file as a GDS
 
-# # These translations/rotations move the PIC to line up with Michael's RACER 5 GDS files for comparison of locations.
-# c.rotate(180)
-# c.movex(-100+1000)
-# c.movey(-100+4000)
 
+# These translations/rotations move the PIC to line up with Michael's RACER 5 GDS files for comparison of locations.
+c.rotate(180)
+c.movex(-100+1000)
+c.movey(-100+4000)
+
+c.draw_ports()
+# print()
+# print(c.ports)
 c.show() # Open the design in KLayout
